@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SomaSpirit 3D Atlas & Synthesized Codex</title>
+<style>
+  /* STRICT GOOGLE SITES CONTAINMENT: Fixed height, clear bottom border, never traps page scroll */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #f8fafc;
+    overflow-x: hidden;
+  }
+
+  #app-shell {
+    width: 100%;
+    height: 700px; /* Hard-locked height so Google Sites never clips or loses the bottom */
+    max-height: 700px;
+    background: #070b14;
+    border: 2px solid #38bdf8;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.65);
+  }
+
+  /* TOP BAR */
+  .top-bar {
+    background: #0f172a;
+    border-bottom: 1px solid #334155;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    font-size: 0.92rem;
+    color: #f8fafc;
+  }
+  .badge-3d {
+    background: linear-gradient(135deg, #38bdf8, #c084fc);
+    color: #020617;
+    font-size: 0.7rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 900;
+  }
+  .tab-bar {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    background: #1e293b;
+    color: #cbd5e1;
+    border: 1px solid #475569;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .tab-btn:hover { border-color: #38bdf8; color: #fff; }
+  .tab-btn.active {
+    background: #0284c7;
+    color: #fff;
+    border-color: #38bdf8;
+    box-shadow: 0 0 10px rgba(56,189,248,0.4);
+  }
+
+  /* MAIN SPLIT WORKSPACE */
+  .main-area {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    min-height: 0; /* Critical for internal scrolling */
+    overflow: hidden;
+  }
+  @media (max-width: 780px) {
+    #app-shell { height: 860px; max-height: 860px; }
+    .main-area {
+      grid-template-columns: 1fr;
+      grid-template-rows: 360px 1fr;
+    }
+  }
+
+  /* LEFT: BUILT-IN 3D STAGE */
+  .stage-wrap {
+    position: relative;
+    background: radial-gradient(circle at 50% 42%, #111c35 0%, #050811 100%);
+    border-right: 1px solid #334155;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  #stage3d {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+    touch-action: none;
+  }
+  #stage3d:active { cursor: grabbing; }
+
+  /* Floating Overlay Controls inside 3D Viewport */
+  .layer-box {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.72rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 5;
+  }
+  .layer-box label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: #e2e8f0;
+  }
+  .hud-pill {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid #38bdf8;
+    border-radius: 8px;
+    padding: 7px 10px;
+    max-width: 195px;
+    font-size: 0.73rem;
+    z-index: 5;
+  }
+  .stage-toolbar {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px;
+    z-index: 5;
+  }
+  .cam-btn {
+    background: rgba(15, 23, 42, 0.92);
+    color: #e2e8f0;
+    border: 1px solid #475569;
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 0.71rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cam-btn:hover { border-color: #38bdf8; color: #38bdf8; }
+
+  /* RIGHT: INTERNAL SCROLLABLE PANEL */
+  .panel-wrap {
+    height: 100%;
+    overflow-y: auto;
+    padding: 12px;
+    background: #0b1120;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .panel-wrap::-webkit-scrollbar { width: 8px; }
+  .panel-wrap::-webkit-scrollbar-track { background: #0f172a; }
+  .panel-wrap::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 4px; }
+
+  .tab-pane { display: none; flex-direction: column; gap: 10px; }
+  .tab-pane.active { display: flex; }
+
+  .card {
+    background: #151f32;
+    border: 1px solid #2d3d56;
+    border-radius: 8px;
+    padding: 11px;
+  }
+  .card h3 {
+    font-size: 0.88rem;
+    color: #fff;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+  }
+  .card p, .card li {
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: #cbd5e1;
+  }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .meta-cell {
+    background: #0f172a;
+    border: 1px solid #26354d;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.73rem;
+  }
+  .meta-cell strong {
+    display: block;
+    font-size: 0.65rem;
+    color: #38bdf8;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  /* Filter & Node List */
+  input[type="text"], select, textarea {
+    width: 100%;
+    background: #090e1a;
+    border: 1px solid #3b4d6b;
+    color: #fff;
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+  }
+  .node-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .node-row {
+    background: #10192b;
+    border: 1px solid #283750;
+    border-radius: 6px;
+    padding: 7px 9px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .node-row:hover, .node-row.active {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.14);
+  }
+  .pill {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 99px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .p-acu { background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+  .p-chk { background: rgba(192,132,252,0.2); color: #e9d5ff; border: 1px solid #c084fc; }
+  .p-aur { background: rgba(52,211,153,0.2); color: #6ee7b7; border: 1px solid #34d399; }
+
+  /* Diagnostic Chips */
+  .chip-wrap { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+  .chip {
+    background: #0f172a;
+    border: 1px solid #475569;
+    color: #cbd5e1;
+    padding: 4px 8px;
+    border-radius: 99px;
+    font-size: 0.72rem;
+    cursor: pointer;
+  }
+  .chip.active {
+    background: #38bdf8;
+    color: #020617;
+    border-color: #38bdf8;
+    font-weight: 700;
+  }
+  .btn-primary {
+    width: 100%;
+    background: linear-gradient(135deg, #0284c7, #2563eb);
+    color: #fff;
+    border: 1px solid #38bdf8;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .btn-primary:hover { filter: brightness(1.12); }
+
+  /* Book Index Controls */
+  .alpha-row, .chap-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .mini-btn {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 0.69rem;
+    cursor: pointer;
+  }
+  .mini-btn.active {
+    background: #c084fc;
+    color: #020617;
+    font-weight: 800;
+    border-color: #c084fc;
+  }
+
+  /* DESIGNATED BOTTOM BAR */
+  .bottom-footer {
+    background: #0f172a;
+    border-top: 2px solid #38bdf8;
+    padding: 6px 12px;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="app-shell">
+  <!-- HEADER -->
+  <div class="top-bar">
+    <div class="brand">
+      <span class="badge-3d">3D ENGINE READY</span>
+      <span>SOMASPIRIT: 12-MERIDIAN, BIOFIELD & CODEX ATLAS</span>
+    </div>
+    <div class="tab-bar" id="main-tabs">
+      <button type="button" class="tab-btn active" data-tab="explorer">1. 3D Point & Meridian Atlas</button>
+      <button type="button" class="tab-btn" data-tab="diagnostics">2. Diagnostic Triage</button>
+      <button type="button" class="tab-btn" data-tab="notes">3. Warding & Session Notes</button>
+      <button type="button" class="tab-btn" data-tab="codex">4. Indexed 5-Book Codex</button>
+    </div>
+  </div>
+
+  <!-- WORKSPACE -->
+  <div class="main-area">
+    <!-- LEFT: ZERO-DEPENDENCY 3D VIEWPORT -->
+    <div class="stage-wrap">
+      <canvas id="stage3d"></canvas>
+
+      <div class="layer-box">
+        <strong style="color:#38bdf8; font-size:0.68rem; text-transform:uppercase;">3D Layers</strong>
+        <label><input type="checkbox" id="chk-body" checked /> 3D Human Mesh & Spine</label>
+        <label><input type="checkbox" id="chk-meridians" checked /> 12 Meridian Pathways</label>
+        <label><input type="checkbox" id="chk-points" checked /> Acupoints & Auricular</label>
+        <label><input type="checkbox" id="chk-chakras" checked /> 7 Chakras & Nerve Hubs</label>
+        <label><input type="checkbox" id="chk-aura" checked /> 3-Tier Aura Biofield</label>
+        <label><input type="checkbox" id="chk-reiki" /> Reiki Byosen Scan Rings</label>
+        <label><input type="checkbox" id="chk-shield" /> Toroidal Protection Ward</label>
+      </div>
+
+      <div class="hud-pill">
+        <div style="font-size:0.65rem; color:#38bdf8; font-weight:800; text-transform:uppercase;" id="hud-cat">Selected 3D Node</div>
+        <div style="font-size:0.84rem; font-weight:800; color:#fff; margin:2px 0;" id="hud-code">GV20 (Baihui)</div>
+        <div style="font-size:0.71rem; color:#cbd5e1;" id="hud-title">Crown Convergence & Sahasrara</div>
+      </div>
+
+      <div class="stage-toolbar">
+        <div style="display:flex; gap:4px; flex-wrap:wrap;">
+          <button type="button" class="cam-btn" data-cam="front">Front</button>
+          <button type="button" class="cam-btn" data-cam="back">Back (Du/BL)</button>
+          <button type="button" class="cam-btn" data-cam="side">Lateral (GB/SJ)</button>
+          <button type="button" class="cam-btn" data-cam="head">Head / Ear</button>
+          <button type="button" class="cam-btn" data-cam="spin" id="btn-spin">Auto-Spin: OFF</button>
+        </div>
+        <div style="display:flex; gap:4px;">
+          <button type="button" class="cam-btn" id="btn-zoom-in">Zoom +</button>
+          <button type="button" class="cam-btn" id="btn-zoom-out">Zoom −</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: SCROLLABLE MULTI-TOOL PANELS -->
+    <div class="panel-wrap">
+
+      <!-- TAB 1: 3D EXPLORER -->
+      <div class="tab-pane active" id="pane-explorer">
+        <div class="card">
+          <h3>
+            <span id="info-title">GV20 (Baihui) — Crown & Sahasrara</span>
+            <span class="pill p-acu" id="info-badge">GV / Du Mai</span>
+          </h3>
+          <p id="info-summary">Midline vertex of the skull. Integrates cranial parasympathetic outflow with the 7th Chakra and primary descending Reiki current.</p>
+          <div class="meta-grid">
+            <div class="meta-cell">
+              <strong>Medical Neuro-Anatomy</strong>
+              <span id="info-neuro">Greater occipital (C2) & auriculotemporal (V3) nerves.</span>
+            </div>
+            <div class="meta-cell">
+              <strong>TCM & Meridian Action</strong>
+              <span id="info-tcm">Raises Yang, clears vertex migraine, calms Shen.</span>
+            </div>
+            <div class="meta-cell">
+              <strong>Biofield & Chakra Axis</strong>
+              <span id="info-aura">7th Chakra (Sahasrara) / Ketheric causal envelope; pineal axis.</span>
+            </div>
+            <div class="meta-cell">
+              <strong>Reiki & Hypno Protocol</strong>
+              <span id="info-reiki">Reiki Head Position 1; top-down hypnotic relaxation cue.</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 135px; gap:6px;">
+          <input type="text" id="search-nodes" placeholder="Search point, nerve, meridian, symptom..." />
+          <select id="filter-meridian">
+            <option value="ALL">All Systems (22)</option>
+            <option value="acu">12 Meridians & CV/GV</option>
+            <option value="chakra">7 Chakras / Plexuses</option>
+            <option value="aur">Auricular (Ear) Micro</option>
+          </select>
+        </div>
+
+        <div class="node-scroll" id="node-list-container"></div>
+      </div>
+
+      <!-- TAB 2: DIAGNOSTICS -->
+      <div class="tab-pane" id="pane-diagnostics">
+        <div class="card">
+          <h3>Multi-Modal Clinical & Biofield Triage</h3>
+          <p>Tap any combination of physical/autonomic and subtle-energy findings below, then click <strong>Synthesize Protocol</strong> to light up the exact 3D points in emerald green.</p>
+
+          <div style="margin-top:8px; font-size:0.69rem; font-weight:800; color:#38bdf8;">SOMATIC & NEURO-AUTONOMIC (ROBINSON)</div>
+          <div class="chip-wrap" id="diag-chips">
+            <span class="chip" data-tag="migraine">Migraine / Occipital Headache</span>
+            <span class="chip" data-tag="vagal">Nausea / Vagal Dysregulation</span>
+            <span class="chip" data-tag="lumbar">Sciatica / Lumbar Pain</span>
+            <span class="chip" data-tag="insomnia">Insomnia / Sympathetic Spike</span>
+            <span class="chip" data-tag="resp">Chest Tightness / Dyspnea</span>
+            <span class="chip" data-tag="immune">Fatigue / Gut-Immune Depletion</span>
+            <span class="chip" data-tag="anger">Liver Qi Stagnation ("Anger")</span>
+            <span class="chip" data-tag="worry">Solar Plexus Static ("Worry")</span>
+            <span class="chip" data-tag="empath">Empathic Overload / Porous Aura</span>
+            <span class="chip" data-tag="ungrounded">Dissociation / Root Depletion</span>
+          </div>
+
+          <button type="button" class="btn-primary" id="btn-run-diag">Synthesize Protocol & Highlight on 3D Model</button>
+        </div>
+
+        <div class="card">
+          <h3>Prescribed 3D Point & Energy Sequence</h3>
+          <p id="diag-result-title">Select symptoms above to generate a custom protocol.</p>
+          <ul id="diag-result-list" style="padding-left:16px; margin-top:6px;"></ul>
+        </div>
+      </div>
+
+      <!-- TAB 3: PROTECTION, HYPNO & SESSION NOTES -->
+      <div class="tab-pane" id="pane-notes">
+        <div class="card">
+          <h3>Practitioner Warding & Hygiene (Sophie Reicher)</h3>
+          <div style="display:flex; flex-direction:column; gap:5px; font-size:0.76rem; margin-top:4px;">
+            <label><input type="checkbox" class="ward-chk" /> 1. Root & KD1 Telluric Grounding Cord active</label>
+            <label><input type="checkbox" class="ward-chk" /> 2. Hara / CV6 (Qihai) energetic centering locked</label>
+            <label><input type="checkbox" class="ward-chk" /> 3. Semi-permeable Rose/Mirror Aura Shield deployed</label>
+            <label><input type="checkbox" class="ward-chk" /> 4. Post-session Kenyoku-ho dry brush & PC6 cold rinse</label>
+          </div>
+          <div style="margin-top:7px; font-size:0.74rem; color:#f43f5e; font-weight:700;" id="ward-readout">
+            3D Toroidal Ward: INACTIVE (Check boxes to deploy on 3D model)
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Clinical & Energetic Session Note Generator</h3>
+          <p style="margin-bottom:6px;">Auto-compiles your selected 3D points, diagnostic triage, and hypno-reiki script into a copyable clinical note.</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px;">
+            <input type="text" id="note-client" placeholder="Client / Focus Label..." />
+            <select id="note-modality">
+              <option value="Acupressure + Reiki + Hypno">Full Synthesis (Acu + Reiki + Hypno)</option>
+              <option value="Medical Acupuncture / Acupressure">Medical Acupressure Focus</option>
+              <option value="Reiki Byosen + Aura Clearing">Reiki Byosen + Aura Focus</option>
+            </select>
+          </div>
+          <button type="button" class="btn-primary" id="btn-build-note" style="margin-top:0; margin-bottom:6px;">Compile Session Note From Active 3D State</button>
+          <textarea id="note-output" rows="6" readonly placeholder="Click 'Compile Session Note' above..."></textarea>
+          <button type="button" class="cam-btn" id="btn-copy-note" style="margin-top:6px; width:100%; padding:6px;">Copy Session Note to Clipboard</button>
+        </div>
+      </div>
+
+      <!-- TAB 4: SYNTHESIZED 5-BOOK CODEX -->
+      <div class="tab-pane" id="pane-codex">
+        <div class="card">
+          <h3>Indexed 5-Book Synthesis Library</h3>
+          <input type="text" id="codex-query" placeholder="Search index (e.g. Byosen, Vagus, Four Gates, Aura, Gokai, Shielding)..." style="margin-top:4px;" />
+          <div class="alpha-row" id="codex-alpha"></div>
+          <div class="chap-row" id="codex-chaps"></div>
+        </div>
+        <div id="codex-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DESIGNATED VISIBLE BOTTOM BAR -->
+  <div class="bottom-footer">
+    <span><strong>3D Controls:</strong> Drag on 3D figure to rotate | Tap any glowing sphere to inspect | Page scroll remains unlocked</span>
+    <span style="color:#38bdf8; font-weight:700;">Bottom Boundary Locked (700px)</span>
+  </div>
+</div>
+
+<script>
+(function() {
+  /* =========================================================================
+     1. EXPANDED 22-NODE DATABASE (12 MERIDIANS, CV/GV, 7 CHAKRAS, AURICULAR)
+     ========================================================================= */
+  const NODES = [
+    { id:"GV20", code:"GV20 (Baihui)", name:"Crown Convergence & Sahasrara", cat:"acu", mer:"Governing Vessel (Du)", pos:[0, 0.84, 0], tags:["migraine","insomnia","ungrounded"],
+      neuro:"Greater occipital (C2) & trigeminal (V1/V3) anastomoses.",
+      tcm:"Governing Vessel 20: Raises clear Yang, calms Shen, relieves vertex headache.",
+      aura:"7th Chakra (Sahasrara) — Causal/Ketheric ovoid; pineal gland regulation.",
+      reiki:"Head Position 1 (Crown); primary cranial entry for descending ki." },
+    { id:"YINTANG", code:"EX-HN3 (Yintang)", name:"Third Eye & Supratrochlear Hub", cat:"chakra", mer:"6th Chakra / Extra", pos:[0, 0.75, 0.13], tags:["migraine","insomnia","worry"],
+      neuro:"Supratrochlear & supraorbital nerves (CN V1); procerus myofascial zone.",
+      tcm:"Calms Shen, relieves frontal headache, sinus congestion, and restlessness.",
+      aura:"6th Chakra (Ajna) — Celestial intuitive layer; pituitary autonomic center.",
+      reiki:"Brow placement; visual fixation anchor for rapid hypnotic eye-closure." },
+    { id:"SHENMEN_EAR", code:"Auricular Shen Men + Vagus", name:"Cymba Conchae Vagal Micro-Point", cat:"aur", mer:"Auricular Micro-System", pos:[0.13, 0.71, 0.01], mirror:true, tags:["vagal","insomnia","migraine","empath"],
+      neuro:"Auricular branch of Vagus Nerve (CN X — Arnold's nerve) & auriculotemporal nerve.",
+      tcm:"Master auricular point for pain modulation, tranquilizing the mind, and anti-inflammatory vagal tone.",
+      aura:"Cranial sensory filter; seals telepathic/auditory overwhelm (Reicher).",
+      reiki:"Cupped palms over both ears; induces deep parasympathetic sigh within 60 seconds." },
+    { id:"GB20", code:"GB20 (Fengchi)", name:"Suboccipital Autonomic & Wind Pool", cat:"acu", mer:"Gallbladder (Foot Shaoyang)", pos:[0.08, 0.67, -0.10], mirror:true, tags:["migraine","insomnia","anger","empath"],
+      neuro:"Greater & lesser occipital nerves; suboccipital triangle & vertebral artery zone.",
+      tcm:"Gallbladder 20: Expels Wind, resolves cervicogenic headache, neck rigidity, and hypertension.",
+      aura:"Alta Major (Medulla) minor chakra — primary dorsal psychic shield anchor.",
+      reiki:"Occipital cradle hold; melts sympathetic fight-or-flight neck armor." },
+    { id:"CV22", code:"CV22 (Tiantu)", name:"Suprasternal Vagal & Vishuddha Throat", cat:"chakra", mer:"5th Chakra / Conception", pos:[0, 0.50, 0.12], tags:["vagal","resp"],
+      neuro:"Cervical cutaneous plexus, recurrent laryngeal & vagal visceral afferents.",
+      tcm:"Conception Vessel 22: Descends Lung Qi, resolves throat constriction ('plum-pit Qi').",
+      aura:"5th Chakra (Vishuddha) — Etheric template; thyroid & vocal somatic truth.",
+      reiki:"Light hover above suprasternal notch; clears suppressed expression." },
+    { id:"LU1", code:"LU1 (Zhongfu)", name:"Pectoral Respiratory Front-Mu", cat:"acu", mer:"Lung (Hand Taiyin)", pos:[0.16, 0.44, 0.12], mirror:true, tags:["resp","immune"],
+      neuro:"Lateral pectoral nerve & 1st/2nd intercostal nerves; pectoralis minor trigger point.",
+      tcm:"Lung 1 (Front-Mu): Disseminates Lung Qi, relieves chest tightness, cough, and grief.",
+      aura:"Upper lateral Heart-Lung wing of the astral biofield.",
+      reiki:"Upper chest bilateral hand placement for deep respiratory grief release." },
+    { id:"CV17", code:"CV17 (Danzhong)", name:"Pericardial Sea of Qi & Anahata Heart", cat:"chakra", mer:"4th Chakra / Conception", pos:[0, 0.34, 0.15], tags:["resp","insomnia","empath"],
+      neuro:"4th intercostal anterior cutaneous branch; cardiac & thymic autonomic plexus.",
+      tcm:"Conception Vessel 17 (Front-Mu of Pericardium): Unbinds chest, regulates Qi, calms cardiac anxiety.",
+      aura:"4th Chakra (Anahata) — Astral bridge uniting somatic lower chakras with spiritual upper tiers.",
+      reiki:"Core Heart placement (Rowland); seat of the Five Reiki Principles (Gokai)." },
+    { id:"CV12", code:"CV12 (Zhongwan)", name:"Celiac Solar Plexus & Manipura Hub", cat:"chakra", mer:"3rd Chakra / Conception", pos:[0, 0.16, 0.15], tags:["vagal","worry","immune","empath"],
+      neuro:"Celiac (solar) autonomic plexus; vagal gastric trunks & T7–T8 nerves.",
+      tcm:"Conception Vessel 12 (Front-Mu of Stomach): Harmonizes Middle Jiao, stops nausea and worry-induced dyspepsia.",
+      aura:"3rd Chakra (Manipura) — Mental/Emotional aura tier; primary site of cords and empathic drain.",
+      reiki:"Upper abdomen Byosen scan zone; Reicher solar plexus mirror-shield center." },
+    { id:"CV6", code:"CV6 (Qihai)", name:"Lower Dan Tian / Hara & Sacral Center", cat:"chakra", mer:"2nd Chakra / Conception", pos:[0, -0.02, 0.14], tags:["immune","ungrounded","lumbar"],
+      neuro:"Iliohypogastric & subcostal nerves (T12–L1); enteric & pelvic autonomic plexus.",
+      tcm:"Conception Vessel 6 (Sea of Qi): Tonifies Yuan (Source) Qi, rescues exhaustion.",
+      aura:"2nd Chakra (Svadhisthana) & Japanese Hara — core reservoir of personal vitality.",
+      reiki:"Primary centering anchor in both Usui Reiki and Spiritual Protection work." },
+    { id:"CV1_ROOT", code:"CV1 / GV1 (Huiyin)", name:"Pelvic Floor & Muladhara Root", cat:"chakra", mer:"1st Chakra / Pelvic Floor", pos:[0, -0.14, 0], tags:["ungrounded","lumbar"],
+      neuro:"Pudendal nerve (S2–S4) & coccygeal plexus.",
+      tcm:"Regulates anterior/posterior Yin orifices, anchors floating Yang.",
+      aura:"1st Chakra (Muladhara) — Etheric physical foundation and telluric grounding cord attachment.",
+      reiki:"Visualized root grounding seal connecting spine to earth." },
+    { id:"BL23", code:"BL23 (Shenshu)", name:"Renal-Adrenal Back-Shu Gate", cat:"acu", mer:"Bladder (Foot Taiyang)", pos:[0.09, 0.08, -0.12], mirror:true, tags:["lumbar","immune","ungrounded"],
+      neuro:"L1–L2 dorsal rami; thoracolumbar fascia & renal/adrenal sympathetic outflow.",
+      tcm:"Bladder 23 (Kidney Back-Shu): Tonifies Kidney Essence, strengthens lower back.",
+      aura:"Posterior adrenal-root battery; replenishes practitioner burnout.",
+      reiki:"Mid-lumbar bilateral placement for deep constitutional recharge." },
+    { id:"LI4", code:"LI4 (Hegu)", name:"Radial-Ulnar Master Analgesic Gate", cat:"acu", mer:"Large Intestine (Hand Yangming)", pos:[0.44, -0.05, 0.08], mirror:true, tags:["migraine","anger","lumbar"],
+      neuro:"Superficial radial & deep ulnar motor nerves (C6–T1); 1st dorsal interosseous.",
+      tcm:"Large Intestine 4 (Yuan-Source): Command point of head/face; potent endorphin analgesia.",
+      aura:"Palm minor chakra emitter; vents stagnant meridian debris.",
+      reiki:"Activates palm Byosen sensitivity prior to scanning the aura." },
+    { id:"PC6", code:"PC6 (Neiguan)", name:"Median Nerve Vagal & Inner Frontier Gate", cat:"acu", mer:"Pericardium (Hand Jueyin)", pos:[0.37, 0.07, 0.07], mirror:true, tags:["vagal","insomnia","resp"],
+      neuro:"Median nerve (C6–T1); modulates nucleus tractus solitarius (vagal brainstem nucleus).",
+      tcm:"Pericardium 6 (Luo): Opens chest, stops nausea/vomiting, calms tachycardia and panic.",
+      aura:"Pericardial heart-shield valve; buffers emotional shock.",
+      reiki:"Primary self-hypnosis tactile anchor (press with thumb during deep exhale)." },
+    { id:"HT7", code:"HT7 (Shenmen)", name:"Ulnar Spirit Gate", cat:"acu", mer:"Heart (Hand Shaoyin)", pos:[0.39, -0.01, 0.07], mirror:true, tags:["insomnia","worry"],
+      neuro:"Ulnar nerve (C8–T1) adjacent to pisiform bone.",
+      tcm:"Heart 7 (Yuan-Source): Nourishes Heart Blood, quiets acute insomnia, panic, and palpitations.",
+      aura:"Direct tranquilizer of the Astral/Emotional aura layer.",
+      reiki:"Wrist hold to settle scattered mental static." },
+    { id:"SJ5", code:"SJ5 (Waiguan)", name:"Posterior Interosseous Outer Boundary Gate", cat:"acu", mer:"San Jiao / Triple Burner", pos:[0.38, 0.08, -0.03], mirror:true, tags:["migraine","immune","empath"],
+      neuro:"Posterior interosseous nerve (radial branch C6–C8).",
+      tcm:"San Jiao 5 (Luo): Releases exterior pathogens, benefits ears and lateral migraine.",
+      aura:"Outer defensive Wei-Qi boundary regulator (strengthens porous aura).",
+      reiki:"Paired with PC6 (sandwich hold through wrist) to align inner and outer shields." },
+    { id:"ST36", code:"ST36 (Zusanli)", name:"Deep Fibular Vagal-Anti-Inflammatory Hub", cat:"acu", mer:"Stomach (Foot Yangming)", pos:[0.14, -0.48, 0.09], mirror:true, tags:["vagal","immune","worry","ungrounded"],
+      neuro:"Deep fibular (peroneal) nerve (L4–L5); drives vagal-adrenal anti-inflammatory reflex.",
+      tcm:"Stomach 36 (He-Sea): Master point for GI vitality, fatigue, and homeostasis.",
+      aura:"Lower-limb earth stabilizer; anchors erratic upper-chakra activity.",
+      reiki:"Knee/anterior shin placement to ground client after trance or cranial work." },
+    { id:"SP6", code:"SP6 (Sanyinjiao)", name:"Tibial Three-Yin Intersection", cat:"acu", mer:"Spleen (Foot Taiyin)", pos:[0.12, -0.68, 0.04], mirror:true, tags:["insomnia","worry","immune"],
+      neuro:"Tibial nerve & saphenous cutaneous branches (L4–S2).",
+      tcm:"Spleen 6: Meeting point of Spleen, Liver, and Kidney Yin channels; nourishes Yin and calms mind.",
+      aura:"Consolidates fluid/emotional cohesion across the lower etheric body.",
+      reiki:"Inner ankle hold for deep parasympathetic restoration." },
+    { id:"BL40", code:"BL40 (Weizhong)", name:"Popliteal Sciatic Command Node", cat:"acu", mer:"Bladder (Foot Taiyang)", pos:[0.13, -0.42, -0.09], mirror:true, tags:["lumbar"],
+      neuro:"Tibial nerve in popliteal fossa (L4–S3 sciatic trunk).",
+      tcm:"Bladder 40 (He-Sea): Command point for the entire lumbar spine and sciatic trajectory.",
+      aura:"Posterior leg energetic release valve.",
+      reiki:"Behind-the-knee cradle to release held survival tension." },
+    { id:"GB34", code:"GB34 (Yanglingquan)", name:"Common Fibular Sinew & Motor Master", cat:"acu", mer:"Gallbladder (Foot Shaoyang)", pos:[0.16, -0.45, 0.02], mirror:true, tags:["anger","lumbar"],
+      neuro:"Common fibular nerve bifurcating into superficial/deep branches (L4–S1).",
+      tcm:"Gallbladder 34 (He-Sea / Influential Point of Sinews): Relaxes muscle spasms, courses Liver/GB Qi.",
+      aura:"Clears lateral structural rigidity stored from chronic frustration.",
+      reiki:"Lateral knee hold for somatic myofascial unwinding." },
+    { id:"LV3", code:"LV3 (Taichong)", name:"Deep Fibular Sympathetic & Liver Source", cat:"acu", mer:"Liver (Foot Jueyin)", pos:[0.13, -0.82, 0.11], mirror:true, tags:["migraine","anger","insomnia","lumbar"],
+      neuro:"Deep fibular nerve dorsum of foot (1st metatarsal space).",
+      tcm:"Liver 3 (Yuan-Source): Courses Liver Qi, subdues rising Yang headache, pairs with LI4 (Four Gates).",
+      aura:"Primary emotional lightning-rod valve ('Just for today, do not anger').",
+      reiki:"Dorsal foot hold to drain cranial pressure downward." },
+    { id:"KD1", code:"KD1 (Yongquan)", name:"Plantar Grounding & Gushing Spring", cat:"acu", mer:"Kidney (Foot Shaoyin)", pos:[0.13, -0.86, 0.02], mirror:true, tags:["insomnia","ungrounded","empath"],
+      neuro:"Medial & lateral plantar nerves (tibial nerve S1–S2).",
+      tcm:"Kidney 1 (Jing-Well): Descends excess heat from the head, rescues collapse, grounds spirit.",
+      aura:"Primary plantar Root chakra intake/drain portal into the earth.",
+      reiki:"Final sealing placement at the soles of the feet." }
+  ];
+
+  const CODEX = [
+    { chap:"I. Medical Acupuncture", let:"A", title:"Autonomic Neuromodulation & Needling Anatomy", src:"Robinson — Interactive Medical Acupuncture Anatomy",
+      body:"Medical acupuncture maps classical meridian points directly onto peripheral nerves, neurovascular bundles, and myofascial trigger zones. Stimulating points like ST36 (deep fibular nerve) or PC6 (median nerve) modulates the spinal dorsal horn, hypothalamus, and vagal brainstem nuclei." },
+    { chap:"I. Medical Acupuncture", let:"A", title:"Auricular Vagal Stimulation (Cymba Conchae & Shen Men)", src:"Robinson — Interactive Medical Acupuncture Anatomy",
+      body:"The superior concha of the outer ear is the only surface area of the human body innervated directly by the auricular branch of the Vagus Nerve (CN X). Acupressure or needling at Auricular Shen Men and the Zero/Vagus point triggers rapid parasympathetic heart-rate variability (HRV) improvements." },
+    { chap:"III. Reiki Pathwork", let:"B", title:"Byosen Scanning: Tactile Biofield Diagnostics", src:"Rowland — Reiki for the Heart and Soul",
+      body:"Byosen ('line of disharmony') refers to subtle sensations—heat, tingling, magnetic pull, throbbing, or coolness—perceived in the practitioner's palms 2 to 5 inches off the body. Tracking Byosen allows targeted treatment of subclinical congestion before or alongside physical palpation." },
+    { chap:"II. Biofield & Auras", let:"C", title:"Chakra-Plexus-Endocrine Synthesis", src:"Shumsky — The Power of Auras",
+      body:"The 7 major chakras overlay anatomical nerve plexuses and endocrine glands: 1. Root (Coccygeal/Adrenal), 2. Sacral (Pelvic/Gonadal), 3. Solar Plexus (Celiac/Pancreas), 4. Heart (Cardiac/Thymus), 5. Throat (Cervical/Thyroid), 6. Third Eye (Cavernous/Pituitary), 7. Crown (Cerebral/Pineal)." },
+    { chap:"I. Medical Acupuncture", let:"F", title:"Four Gates Protocol (Bilateral LI4 + LV3)", src:"Robinson — Interactive Medical Acupuncture Anatomy",
+      body:"Simultaneous stimulation of LI4 (Hegu, radial/ulnar hand innervation) and LV3 (Taichong, deep fibular foot innervation) delivers four-limb somatosensory input that activates descending pain-inhibitory pathways from the periaqueductal gray (PAG) and down-regulates sympathetic overdrive." },
+    { chap:"III. Reiki Pathwork", let:"G", title:"Gokai: The Five Reiki Precepts as Psychosomatic Medicine", src:"Rowland — Reiki for the Heart and Soul",
+      body:"Just for today: 1. Do not anger (releases sympathetic Liver/GB hypertonicity at LV3/GB20), 2. Do not worry (restores enteric vagal tone at CV12/ST36), 3. Be grateful (expands cardiac coherence at CV17), 4. Work with diligence (anchors Hara at CV6), 5. Be kind to people." },
+    { chap:"IV. Spiritual Protection", let:"G", title:"Grounding & Hara Centering for Practitioners", src:"Reicher — Spiritual Protection: A Safety Manual",
+      body:"Empaths and clinicians frequently experience mirror-neuron fatigue and biofield contamination. Grounding drops an energetic sink from CV1 and KD1 into the earth, while Centering consolidates personal ki at the Hara (CV6) so the healer acts as a clean conduit rather than absorbing patient symptoms." },
+    { chap:"V. Integrative Hypnotherapy", let:"H", title:"Hypno-Acupressure Conditioned Somatic Anchors", src:"Cawthorn & Mackereth — Integrative Hypnotherapy",
+      body:"Pairing verbal hypnotic suggestions of safety and analgesia with physical finger pressure on PC6 (Neiguan) or Yintang builds a conditioned neurological reflex. Clients can later fire this calm response independently during clinical procedures or pain flares." },
+    { chap:"II. Biofield & Auras", let:"S", title:"Seven Concentric Tiers of the Human Biofield", src:"Shumsky — The Power of Auras",
+      body:"The subtle body radiates in interpenetrating bands: Etheric (vital matrix 1–2 in. from skin), Emotional (fluid chromatic field), Mental (structured thought-field), Astral Bridge (Heart relational hub), Etheric Template, Celestial, and Ketheric/Causal outer boundary ovoid." },
+    { chap:"IV. Spiritual Protection", let:"W", title:"Warding, Shielding & Post-Session Decontamination", src:"Reicher — Spiritual Protection: A Safety Manual",
+      body:"Effective shields are semi-permeable—deflecting projective emotional static while allowing natural breath and ki flow. Post-session hygiene combines Kenyoku-ho (diagonal dry-brushing across chest and arms) with washing the hands and wrists (PC6/HT7) in cool running water." }
+  ];
+
+  /* =========================================================================
+     2. BUILT-IN ZERO-DEPENDENCY 3D ENGINE (HTML5 CANVAS)
+     ========================================================================= */
+  const canvas = document.getElementById("stage3d");
+  const ctx = canvas.getContext("2d");
+
+  let rotY = 0.25, rotX = 0.08, zoom = 1.0, autoSpin = false;
+  let isDragging = false, lastX = 0, lastY = 0;
+  let selectedId = "GV20";
+  let highlightedIds = new Set();
+  let projectedHitBoxes = [];
+
+  // Layer states
+  const layers = {
+    body: true, meridians: true, points: true,
+    chakras: true, aura: true, reiki: false, shield: false
+  };
+
+  // Pre-build 3D Human Silhouette Rings (Head, Neck, Torso, Pelvis, Arms, Legs)
+  const bodyRings = [];
+  function generateBodyMesh() {
+    // Head
+    for (let i = 0; i <= 6; i++) {
+      const t = i / 6;
+      const y = 0.65 + t * 0.20;
+      const r = Math.sin(t * Math.PI) * 0.095 + 0.02;
+      bodyRings.push({ cx: 0, y, rx: r * 0.9, rz: r, segs: 12 });
+    }
+    // Neck
+    bodyRings.push({ cx: 0, y: 0.58, rx: 0.048, rz: 0.048, segs: 10 });
+    // Torso & Pelvis
+    const torsoProfile = [
+      { y: 0.50, rx: 0.17, rz: 0.10 },
+      { y: 0.36, rx: 0.16, rz: 0.12 },
+      { y: 0.20, rx: 0.13, rz: 0.11 },
+      { y: 0.05, rx: 0.14, rz: 0.11 },
+      { y: -0.10, rx: 0.15, rz: 0.11 }
+    ];
+    torsoProfile.forEach(p => bodyRings.push({ cx: 0, y: p.y, rx: p.rx, rz: p.rz, segs: 16 }));
+
+    // Left & Right Legs
+    [-1, 1].forEach(s => {
+      [-0.22, -0.36, -0.50, -0.66, -0.82].forEach((y, idx) => {
+        const r = 0.068 - idx * 0.007;
+        bodyRings.push({ cx: s * 0.11, y, rx: r, rz: r, segs: 10 });
+      });
+    });
+  }
+  generateBodyMesh();
+
+  function resizeCanvas() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(300, rect.width) * dpr;
+    canvas.height = Math.max(300, rect.height) * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function project3D(x, y, z, w, h) {
+    // Rotate around Y
+    const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+    const x1 = x * cosY - z * sinY;
+    const z1 = x * sinY + z * cosY;
+    // Rotate around X
+    const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+    const y2 = y * cosX - z1 * sinX;
+    const z2 = y * sinX + z1 * cosX;
+
+    const fov = 2.6;
+    const scale = (Math.min(w, h) * 0.46 * zoom) * (fov / (fov + z2 + 1.2));
+    return {
+      sx: w * 0.5 + x1 * scale,
+      sy: h * 0.49 - y2 * scale,
+      z: z2,
+      scale
+    };
+  }
+
+  function draw3DScene(time) {
+    const w = canvas.clientWidth || 420;
+    const h = canvas.clientHeight || 500;
+    ctx.clearRect(0, 0, w, h);
+    const t = time * 0.002;
+
+    if (autoSpin && !isDragging) rotY += 0.008;
+
+    // 1. Draw Floor Perspective Grid
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.16)";
+    ctx.lineWidth = 1;
+    for (let g = -0.5; g <= 0.5; g += 0.25) {
+      const p1 = project3D(g, -0.90, -0.5, w, h);
+      const p2 = project3D(g, -0.90, 0.5, w, h);
+      ctx.beginPath(); ctx.moveTo(p1.sx, p1.sy); ctx.lineTo(p2.sx, p2.sy); ctx.stroke();
+      const p3 = project3D(-0.5, -0.90, g, w, h);
+      const p4 = project3D(0.5, -0.90, g, w, h);
+      ctx.beginPath(); ctx.moveTo(p3.sx, p3.sy); ctx.lineTo(p4.sx, p4.sy); ctx.stroke();
+    }
+
+    // 2. Draw 3-Tier Aura Biofield Envelopes
+    if (layers.aura) {
+      const auraTiers = [
+        { rx: 0.36, ry: 0.96, col: "rgba(56, 189, 248, 0.20)" },
+        { rx: 0.46, ry: 1.04, col: "rgba(192, 132, 252, 0.16)" },
+        { rx: 0.56, ry: 1.12, col: "rgba(250, 204, 21, 0.12)" }
+      ];
+      auraTiers.forEach((a, idx) => {
+        ctx.strokeStyle = a.col;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let i = 0; i <= 36; i++) {
+          const ang = (i / 36) * Math.PI * 2;
+          const px = Math.cos(ang) * a.rx * (1 + Math.sin(t + idx) * 0.03);
+          const py = Math.sin(ang) * a.ry;
+          const pr = project3D(px, py, 0, w, h);
+          if (i === 0) ctx.moveTo(pr.sx, pr.sy); else ctx.lineTo(pr.sx, pr.sy);
+        }
+        ctx.stroke();
+      });
+    }
+
+    // 3. Draw 3D Anatomical Wireframe Rings + Limb Bones + Central Spine
+    if (layers.body) {
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.28)";
+      ctx.lineWidth = 1;
+      bodyRings.forEach(r => {
+        ctx.beginPath();
+        for (let i = 0; i <= r.segs; i++) {
+          const a = (i / r.segs) * Math.PI * 2;
+          const px = r.cx + Math.cos(a) * r.rx;
+          const pz = Math.sin(a) * r.rz;
+          const pr = project3D(px, r.y, pz, w, h);
+          if (i === 0) ctx.moveTo(pr.sx, pr.sy); else ctx.lineTo(pr.sx, pr.sy);
+        }
+        ctx.stroke();
+      });
+
+      // Arms & Central Spinal Sushumna Conduit
+      [-1, 1].forEach(s => {
+        const armPts = [
+          [s * 0.17, 0.48, 0], [s * 0.29, 0.24, 0.02],
+          [s * 0.38, 0.04, 0.05], [s * 0.44, -0.06, 0.08]
+        ];
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.42)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        armPts.forEach((pt, i) => {
+          const pr = project3D(pt[0], pt[1], pt[2], w, h);
+          if (i === 0) ctx.moveTo(pr.sx, pr.sy); else ctx.lineTo(pr.sx, pr.sy);
+        });
+        ctx.stroke();
+      });
+
+      // Glowing Central Spinal Cord / Sushumna
+      const spTop = project3D(0, 0.84, 0, w, h);
+      const spBot = project3D(0, -0.14, 0, w, h);
+      ctx.strokeStyle = "rgba(232, 121, 249, 0.55)";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(spTop.sx, spTop.sy); ctx.lineTo(spBot.sx, spBot.sy); ctx.stroke();
+    }
+
+    // 4. Draw 12 Meridian & CV/GV Pathways
+    if (layers.meridians) {
+      const channels = [
+        // Conception Vessel (Anterior Midline)
+        { col: "rgba(245, 158, 11, 0.65)", pts: [[0,0.50,0.12],[0,0.34,0.15],[0,0.16,0.15],[0,-0.02,0.14],[0,-0.14,0]] },
+        // Governing Vessel (Posterior Midline)
+        { col: "rgba(56, 189, 248, 0.65)", pts: [[0,0.84,0],[0,0.67,-0.10],[0,0.35,-0.13],[0,0.08,-0.12],[0,-0.14,-0.08]] },
+        // Stomach / Spleen / Liver Leg trajectories (mirrored)
+        { col: "rgba(52, 211, 153, 0.55)", mirror:true, pts: [[0.14,0.10,0.11],[0.14,-0.20,0.10],[0.14,-0.48,0.09],[0.13,-0.82,0.11]] },
+        // Bladder Dorsal Line (mirrored)
+        { col: "rgba(96, 165, 250, 0.55)", mirror:true, pts: [[0.08,0.67,-0.10],[0.09,0.38,-0.13],[0.09,0.08,-0.12],[0.13,-0.42,-0.09],[0.13,-0.84,-0.04]] }
+      ];
+      channels.forEach(ch => {
+        const sides = ch.mirror ? [-1, 1] : [1];
+        sides.forEach(s => {
+          ctx.strokeStyle = ch.col;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ch.pts.forEach((pt, idx) => {
+            const pr = project3D(pt[0] * s, pt[1], pt[2], w, h);
+            if (idx === 0) ctx.moveTo(pr.sx, pr.sy); else ctx.lineTo(pr.sx, pr.sy);
+          });
+          ctx.stroke();
+        });
+      });
+    }
+
+    // 5. Draw 7 Pulsing Chakra Rings
+    if (layers.chakras) {
+      const chakras = [
+        { y: -0.14, col: "#ef4444" },
+        { y: -0.02, col: "#f97316" },
+        { y: 0.16,  col: "#eab308" },
+        { y: 0.34,  col: "#22c55e" },
+        { y: 0.50,  col: "#38bdf8" },
+        { y: 0.75,  col: "#818cf8" },
+        { y: 0.84,  col: "#e879f9" }
+      ];
+      chakras.forEach((c, idx) => {
+        const pulse = 0.055 + Math.sin(t * 2 + idx) * 0.008;
+        ctx.strokeStyle = c.col;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i <= 20; i++) {
+          const a = (i / 20) * Math.PI * 2;
+          const pr = project3D(Math.cos(a) * pulse, c.y, Math.sin(a) * pulse, w, h);
+          if (i === 0) ctx.moveTo(pr.sx, pr.sy); else ctx.lineTo(pr.sx, pr.sy);
+        }
+        ctx.stroke();
+      });
+    }
+
+    // 6. Draw Reiki Byosen Scanning Rings
+    if (layers.reiki) {
+      for (let r = 0; r < 2; r++) {
+        const scanY = Math.sin(t * 1.2 + r * 2) * 0.75;
+        ctx.strokeStyle = "rgba(52, 211, 153, 0.75)";
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        for (let i = 0; i <= 28; i++) {
+          const a = (i / 28) * Math.PI * 2;
+          const pr = project3D(Math.cos(a) * 0.28, scanY, Math.sin(a) * 0.22, w, h);
+          if (i === 0) ctx.moveTo(pr.sx, pr.sy); else ctx.lineTo(pr.sx, pr.sy);
+        }
+        ctx.stroke();
+      }
+    }
+
+    // 7. Draw Toroidal Warding Shield
+    if (layers.shield) {
+      ctx.strokeStyle = "rgba(244, 63, 94, 0.45)";
+      ctx.lineWidth = 1.4;
+      for (let m = 0; m < 6; m++) {
+        const meridAng = (m / 6) * Math.PI + t * 0.4;
+        ctx.beginPath();
+        for (let i = 0; i <= 28; i++) {
+          const a = (i / 28) * Math.PI * 2;
+          const rad = Math.sin(a) * 0.52;
+          const px = Math.cos(meridAng) * rad;
+          const pz = Math.sin(meridAng) * rad;
+          const py = Math.cos(a) * 1.02;
+          const pr = project3D(px, py, pz, w, h);
+          if (i === 0) ctx.moveTo(pr.sx, pr.sy); else ctx.lineTo(pr.sx, pr.sy);
+        }
+        ctx.stroke();
+      }
+    }
+
+    // 8. Draw Clickable 3D Acupoints, Chakras & Auricular Nodes
+    projectedHitBoxes = [];
+    NODES.forEach(n => {
+      if (n.cat === "chakra" && !layers.chakras) return;
+      if (n.cat !== "chakra" && !layers.points) return;
+
+      const coords = [n.pos];
+      if (n.mirror) coords.push([-n.pos[0], n.pos[1], n.pos[2]]);
+
+      coords.forEach((pt, sideIdx) => {
+        const pr = project3D(pt[0], pt[1], pt[2], w, h);
+        const isSel = n.id === selectedId;
+        const isDiag = highlightedIds.has(n.id);
+
+        let fill = n.cat === "chakra" ? "#c084fc" : (n.cat === "aur" ? "#34d399" : "#f59e0b");
+        let radius = isSel ? 7.5 : (isDiag ? 7.0 : 4.8);
+        if (isSel) fill = "#38bdf8";
+        else if (isDiag) fill = "#10b981";
+
+        // Outer glow
+        if (isSel || isDiag) {
+          ctx.fillStyle = isSel ? "rgba(56, 189, 248, 0.32)" : "rgba(16, 185, 129, 0.32)";
+          ctx.beginPath();
+          ctx.arc(pr.sx, pr.sy, radius + 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = "#020617";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(pr.sx, pr.sy, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Callout label on primary side
+        if ((isSel || isDiag) && sideIdx === 0) {
+          ctx.fillStyle = "#f8fafc";
+          ctx.font = "bold 11px sans-serif";
+          ctx.fillText(n.code.split(" ")[0], pr.sx + 9, pr.sy + 4);
+        }
+
+        projectedHitBoxes.push({ id: n.id, x: pr.sx, y: pr.sy, r: 13 });
+      });
+    });
+
+    requestAnimationFrame(draw3DScene);
+  }
+
+  /* =========================================================================
+     3. POINTER & UI EVENT LISTENERS (NO INLINE ONCLICK DEPENDENCIES)
+     ========================================================================= */
+  canvas.addEventListener("pointerdown", e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    // Check if user tapped a 3D node
+    for (let i = projectedHitBoxes.length - 1; i >= 0; i--) {
+      const b = projectedHitBoxes[i];
+      const dist = Math.hypot(mx - b.x, my - b.y);
+      if (dist <= b.r) {
+        selectNode(b.id);
+        return;
+      }
+    }
+
+    isDragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener("pointermove", e => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    rotY += dx * 0.01;
+    rotX = Math.max(-0.8, Math.min(0.8, rotX + dy * 0.008));
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+
+  canvas.addEventListener("pointerup", () => { isDragging = false; });
+
+  // Camera Presets & Zoom
+  document.querySelectorAll("[data-cam]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mode = btn.getAttribute("data-cam");
+      if (mode === "front") { rotY = 0; rotX = 0.05; zoom = 1.0; }
+      else if (mode === "back") { rotY = Math.PI; rotX = 0.05; zoom = 1.0; }
+      else if (mode === "side") { rotY = Math.PI * 0.5; rotX = 0.05; zoom = 1.0; }
+      else if (mode === "head") { rotY = 0.2; rotX = -0.15; zoom = 1.65; }
+      else if (mode === "spin") {
+        autoSpin = !autoSpin;
+        btn.textContent = "Auto-Spin: " + (autoSpin ? "ON" : "OFF");
+      }
+    });
+  });
+
+  document.getElementById("btn-zoom-in").addEventListener("click", () => { zoom = Math.min(2.2, zoom + 0.2); });
+  document.getElementById("btn-zoom-out").addEventListener("click", () => { zoom = Math.max(0.65, zoom - 0.2); });
+
+  // Layer Checkboxes
+  const layerMap = {
+    "chk-body": "body", "chk-meridians": "meridians", "chk-points": "points",
+    "chk-chakras": "chakras", "chk-aura": "aura", "chk-reiki": "reiki", "chk-shield": "shield"
+  };
+  Object.keys(layerMap).forEach(id => {
+    document.getElementById(id).addEventListener("change", e => {
+      layers[layerMap[id]] = e.target.checked;
+    });
+  });
+
+  // Main Navigation Tabs
+  document.querySelectorAll("#main-tabs .tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const target = btn.getAttribute("data-tab");
+      document.querySelectorAll("#main-tabs .tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+      document.getElementById("pane-" + target).classList.add("active");
+    });
+  });
+
+  // Select Node & Render List
+  function selectNode(id) {
+    selectedId = id;
+    const n = NODES.find(x => x.id === id);
+    if (!n) return;
+
+    document.getElementById("hud-cat").textContent = n.mer;
+    document.getElementById("hud-code").textContent = n.code;
+    document.getElementById("hud-title").textContent = n.name;
+
+    document.getElementById("info-title").textContent = n.code + " — " + n.name;
+    document.getElementById("info-badge").textContent = n.mer;
+    document.getElementById("info-neuro").textContent = n.neuro;
+    document.getElementById("info-tcm").textContent = n.tcm;
+    document.getElementById("info-aura").textContent = n.aura;
+    document.getElementById("info-reiki").textContent = n.reiki;
+
+    // Rotate 3D model toward Posterior if a back point is selected
+    if (n.pos[2] < -0.05) rotY = Math.PI * 0.85;
+    else if (Math.abs(rotY) > Math.PI * 0.6) rotY = 0.25;
+
+    renderNodeList();
+  }
+
+  function renderNodeList() {
+    const q = document.getElementById("search-nodes").value.toLowerCase();
+    const f = document.getElementById("filter-meridian").value;
+    const box = document.getElementById("node-list-container");
+    box.innerHTML = "";
+
+    NODES.filter(n => {
+      const matchCat = f === "ALL" || n.cat === f;
+      const matchTxt = (n.code + n.name + n.mer + n.neuro + n.tcm + n.aura).toLowerCase().includes(q);
+      return matchCat && matchTxt;
+    }).forEach(n => {
+      const row = document.createElement("div");
+      row.className = "node-row" + (n.id === selectedId ? " active" : "");
+      const pillClass = n.cat === "chakra" ? "p-chk" : (n.cat === "aur" ? "p-aur" : "p-acu");
+      row.innerHTML = `
+        <div>
+          <div style="font-weight:700; font-size:0.78rem; color:#fff;">${n.code} — ${n.name}</div>
+          <div style="font-size:0.7rem; color:#94a3b8;">${n.mer} | ${n.neuro.slice(0, 48)}...</div>
+        </div>
+        <span class="pill ${pillClass}">${n.cat.toUpperCase()}</span>
+      `;
+      row.addEventListener("click", () => selectNode(n.id));
+      box.appendChild(row);
+    });
+  }
+
+  document.getElementById("search-nodes").addEventListener("input", renderNodeList);
+  document.getElementById("filter-meridian").addEventListener("change", renderNodeList);
+
+  // Diagnostics Triage
+  const activeTags = new Set();
+  document.querySelectorAll("#diag-chips .chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const tag = chip.getAttribute("data-tag");
+      chip.classList.toggle("active");
+      if (activeTags.has(tag)) activeTags.delete(tag); else activeTags.add(tag);
+    });
+  });
+
+  document.getElementById("btn-run-diag").addEventListener("click", () => {
+    const matched = NODES.filter(n => n.tags.some(t => activeTags.has(t)));
+    const titleEl = document.getElementById("diag-result-title");
+    const listEl = document.getElementById("diag-result-list");
+    listEl.innerHTML = "";
+    highlightedIds.clear();
+
+    if (matched.length === 0) {
+      titleEl.textContent = "Tap at least one physical or biofield finding above first.";
+      return;
+    }
+
+    matched.forEach(m => highlightedIds.add(m.id));
+    layers.reiki = true;
+    document.getElementById("chk-reiki").checked = true;
+
+    titleEl.innerHTML = `<strong style="color:#34d399;">${matched.length} Target Nodes Illuminated in Green on 3D Model:</strong>`;
+    matched.forEach(m => {
+      const li = document.createElement("li");
+      li.style.marginBottom = "6px";
+      li.innerHTML = `<strong>${m.code} (${m.name}):</strong> ${m.tcm} <em>[Reiki/Subtle: ${m.reiki}]</em>`;
+      listEl.appendChild(li);
+    });
+  });
+
+  // Warding & Session Notes
+  document.querySelectorAll(".ward-chk").forEach(chk => {
+    chk.addEventListener("change", () => {
+      const all = document.querySelectorAll(".ward-chk");
+      let count = 0;
+      all.forEach(c => { if (c.checked) count++; });
+      const pct = Math.round((count / all.length) * 100);
+      layers.shield = count > 0;
+      document.getElementById("chk-shield").checked = count > 0;
+      document.getElementById("ward-readout").textContent =
+        count > 0 ? `3D Toroidal Ward: ACTIVE (${pct}% Containment Integrity)` : "3D Toroidal Ward: INACTIVE";
+    });
+  });
+
+  document.getElementById("btn-build-note").addEventListener("click", () => {
+    const client = document.getElementById("note-client").value || "Self / General Practice";
+    const mod = document.getElementById("note-modality").value;
+    const curNode = NODES.find(x => x.id === selectedId);
+    const diagList = Array.from(highlightedIds).map(id => NODES.find(x => x.id === id)?.code).filter(Boolean);
+
+    const text = [
+      `=== SOMASPIRIT CLINICAL & ENERGETIC SESSION NOTE ===`,
+      `Client / Focus: ${client} | Modality: ${mod}`,
+      `Primary Inspected Node: ${curNode.code} (${curNode.name}) — ${curNode.neuro}`,
+      `Active Triage Protocol Nodes: ${diagList.length ? diagList.join(", ") : curNode.code}`,
+      `Subtle & Reiki Integration: ${curNode.aura} | ${curNode.reiki}`,
+      `Practitioner Warding Status: ${document.getElementById("ward-readout").textContent}`,
+      `Gokai Affirmation: "Just for today, do not anger, do not worry, be grateful, work diligently, be kind."`
+    ].join("\n");
+    document.getElementById("note-output").value = text;
+  });
+
+  document.getElementById("btn-copy-note").addEventListener("click", () => {
+    const out = document.getElementById("note-output");
+    out.select();
+    document.execCommand("copy");
+    document.getElementById("btn-copy-note").textContent = "Copied to Clipboard!";
+    setTimeout(() => { document.getElementById("btn-copy-note").textContent = "Copy Session Note to Clipboard"; }, 2000);
+  });
+
+  // Synthesized 5-Book Codex
+  let curAlpha = "ALL", curChap = "ALL";
+  const alphaContainer = document.getElementById("codex-alpha");
+  ["ALL", "A", "B", "C", "F", "G", "H", "S", "W"].forEach(l => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "mini-btn" + (l === "ALL" ? " active" : "");
+    b.textContent = l;
+    b.addEventListener("click", () => {
+      curAlpha = l;
+      alphaContainer.querySelectorAll(".mini-btn").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      renderCodex();
+    });
+    alphaContainer.appendChild(b);
+  });
+
+  const chapContainer = document.getElementById("codex-chaps");
+  ["ALL", "I. Medical Acupuncture", "II. Biofield & Auras", "III. Reiki Pathwork", "IV. Spiritual Protection", "V. Integrative Hypnotherapy"].forEach(c => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "mini-btn" + (c === "ALL" ? " active" : "");
+    b.textContent = c;
+    b.addEventListener("click", () => {
+      curChap = c;
+      chapContainer.querySelectorAll(".mini-btn").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      renderCodex();
+    });
+    chapContainer.appendChild(b);
+  });
+
+  function renderCodex() {
+    const q = document.getElementById("codex-query").value.toLowerCase();
+    const list = document.getElementById("codex-list");
+    list.innerHTML = "";
+
+    CODEX.filter(e => {
+      const mA = curAlpha === "ALL" || e.let === curAlpha;
+      const mC = curChap === "ALL" || e.chap === curChap;
+      const mQ = (e.title + e.body + e.src + e.chap).toLowerCase().includes(q);
+      return mA && mC && mQ;
+    }).forEach(e => {
+      const d = document.createElement("div");
+      d.className = "card";
+      d.innerHTML = `
+        <div style="font-size:0.66rem; color:#34d399; font-weight:800; text-transform:uppercase;">${e.chap} — Index [${e.let}]</div>
+        <h3 style="margin-top:2px;">${e.title}</h3>
+        <p>${e.body}</p>
+        <div style="margin-top:5px; font-size:0.68rem; color:#38bdf8;">Source: ${e.src}</div>
+      `;
+      list.appendChild(d);
+    });
+  }
+
+  document.getElementById("codex-query").addEventListener("input", renderCodex);
+
+  // Boot Everything Immediately
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+  renderNodeList();
+  renderCodex();
+  requestAnimationFrame(draw3DScene);
+})();
+</script>
+</body>
+</html>
